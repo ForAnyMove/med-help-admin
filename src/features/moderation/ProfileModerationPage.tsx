@@ -20,7 +20,7 @@ export const ProfileModerationPage: React.FC = () => {
   });
 
   const updateStatus = useMutation({
-    mutationFn: ({ status, comment }: { status: 'verified' | 'rejected', comment?: string }) => 
+    mutationFn: ({ status, comment }: { status: 'approved' | 'rejected', comment?: string }) => 
       api.put(`/moderation/profiles/${selectedProfileId}`, { type: typeFilter, status, comment }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['moderationProfiles'] });
@@ -29,7 +29,7 @@ export const ProfileModerationPage: React.FC = () => {
     }
   });
 
-  const handleAction = (status: 'verified' | 'rejected') => {
+  const handleAction = (status: 'approved' | 'rejected') => {
     const comment = status === 'rejected' ? window.prompt(t('common.reasonForRejection')) : '';
     if (status === 'rejected' && comment === null) return;
     
@@ -41,7 +41,7 @@ export const ProfileModerationPage: React.FC = () => {
   const statusTabs = [
     { id: 'all', label: t('common.all') },
     { id: 'pending', label: t('common.pending') },
-    { id: 'verified', label: t('common.verified') },
+    { id: 'approved', label: t('common.approved') },
     { id: 'rejected', label: t('common.rejected') }
   ];
 
@@ -130,8 +130,8 @@ export const ProfileModerationPage: React.FC = () => {
                     </div>
                     
                     <div style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: 12, 
-                      backgroundColor: status === 'pending' ? 'var(--warning-bg)' : status === 'verified' ? 'var(--success-bg)' : 'var(--danger-bg)',
-                      color: status === 'pending' ? 'var(--warning)' : status === 'verified' ? 'var(--success)' : 'var(--danger)'
+                      backgroundColor: status === 'pending' ? 'var(--warning-bg)' : status === 'approved' ? 'var(--success-bg)' : 'var(--danger-bg)',
+                      color: status === 'pending' ? 'var(--warning)' : status === 'approved' ? 'var(--success)' : 'var(--danger)'
                     }}>
                       {status}
                     </div>
@@ -160,7 +160,7 @@ export const ProfileModerationPage: React.FC = () => {
                 <h4 style={{ alignSelf: 'flex-start' }}>{t('moderation.avatarImg')}</h4>
                 <div style={{ padding: '1rem', border: '2px dashed var(--n300)', borderRadius: '12px' }}>
                   <img 
-                    src={selectedProfile.avatar_url} 
+                    src={selectedProfile.pending_avatar_url || selectedProfile.avatar_url} 
                     alt="avatar" 
                     style={{ maxWidth: '300px', maxHeight: '300px', borderRadius: '12px', objectFit: 'contain' }}
                   />
@@ -172,7 +172,7 @@ export const ProfileModerationPage: React.FC = () => {
               <div>
                 <h4 style={{ marginBottom: '1rem' }}>{t('moderation.aboutText')}</h4>
                 <div style={{ padding: '1rem', backgroundColor: 'var(--n50)', border: '1px solid var(--n200)', borderRadius: '12px', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-                  {selectedProfile.about}
+                  {selectedProfile.pending_about || selectedProfile.about}
                 </div>
               </div>
             )}
@@ -194,7 +194,7 @@ export const ProfileModerationPage: React.FC = () => {
               <button 
                 className="btn btn-primary" 
                 style={{ flex: 1, backgroundColor: 'var(--success)' }}
-                onClick={() => handleAction('verified')}
+                onClick={() => handleAction('approved')}
                 disabled={updateStatus.isPending}
               >
                 <Check size={18} /> {t('common.approve')}

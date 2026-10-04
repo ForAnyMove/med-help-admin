@@ -44,6 +44,7 @@ export const AdminLayout: React.FC = () => {
       items: [
         { to: '/moderation/profiles', icon: ShieldAlert, label: t('sidebar.profiles') },
         { to: '/moderation/reviews', icon: Star, label: t('sidebar.reviews') },
+        { to: '/moderation/reports', icon: ShieldAlert, label: t('sidebar.reports', 'Reports') },
       ]
     },
     {

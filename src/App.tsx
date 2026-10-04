@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './features/auth/AuthContext';
 import { LoginPage } from './features/auth/LoginPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
+import { SocketProvider } from './context/SocketContext';
+import { Toaster } from 'sonner';
 import { DoctorVerificationPage } from './features/verification/DoctorVerificationPage';
 import { OrgVerificationPage } from './features/verification/OrgVerificationPage';
 import { ProfileModerationPage } from './features/moderation/ProfileModerationPage';
@@ -18,6 +20,7 @@ import { ConsultationsPage } from './features/consultations/ConsultationsPage';
 import { StatisticsPage } from './features/statistics/StatisticsPage';
 import { BillingPage } from './features/billing/BillingPage';
 import { SettingsPage } from './features/settings/SettingsPage';
+import { ReportsPage } from './features/moderation/ReportsPage';
 import { NotFoundPage } from './features/error/NotFoundPage';
 import { AdminLayout } from './layouts/AdminLayout';
 import './i18n';
@@ -37,6 +40,21 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  return <>{children}</>;
+};
+
+// Role-based Route wrapper
+const RequireRole = ({ children, allowedRoles }: { children: React.ReactNode, allowedRoles: string[] }) => {
+  const { user } = useAuth(); // Assuming useAuth exposes the logged-in admin as `user`
+  if (!user || !user.role) return <Navigate to="/login" replace />;
+  if (!allowedRoles.includes(user.role)) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center' }}>
+        <h2 style={{ color: '#e74c3c' }}>Access Denied</h2>
+        <p>You do not have permission to view this page.</p>
+      </div>
+    );
+  }
   return <>{children}</>;
 };
 
@@ -62,6 +80,7 @@ const router = createBrowserRouter([
       { path: 'verification/organizations', element: <OrgVerificationPage /> },
       { path: 'moderation/profiles', element: <ProfileModerationPage /> },
       { path: 'moderation/reviews', element: <ReviewModerationPage /> },
+      { path: 'moderation/reports', element: <ReportsPage /> },
       { path: 'consultations', element: <ConsultationsPage /> },
       { path: 'billing', element: <BillingPage /> },
       { path: 'users', element: <UsersPage /> },
@@ -71,7 +90,7 @@ const router = createBrowserRouter([
       { path: 'professions', element: <ProfessionsPage /> },
       { path: 'statistics', element: <StatisticsPage /> },
       { path: 'settings', element: <SettingsPage /> },
-      { path: 'admins', element: <AdminManagementPage /> }, // super_admin only
+      { path: 'admins', element: <RequireRole allowedRoles={['super_admin']}><AdminManagementPage /></RequireRole> }, // super_admin only
     ],
   },
 ]);
@@ -80,7 +99,10 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <RouterProvider router={router} />
+        <SocketProvider>
+          <Toaster richColors position="top-right" />
+          <RouterProvider router={router} />
+        </SocketProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

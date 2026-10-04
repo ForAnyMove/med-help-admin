@@ -31,6 +31,7 @@
     "reject": "Reject",
     "pending": "Pending",
     "verified": "Verified",
+    "approved": "Approved",
     "rejected": "Rejected",
     "all": "All",
     "loading": "Loading...",
@@ -211,5 +212,10 @@
     "unexpectedDesc": "Something went wrong on our end. Please try again later.",
     "goBack": "Go Back",
     "goHome": "Dashboard"
+  },
+  "notifications": {
+    "newReport": "New Moderation Report",
+    "newProfileModeration": "New Profile Moderation Request",
+    "newDocVerification": "New Document Verification Request"
   }
 }
