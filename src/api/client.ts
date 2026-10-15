@@ -1,32 +1,30 @@
 const BASE_URL = import.meta.env.DEV ? 'http://localhost:3000/api/admin' : (import.meta.env.VITE_API_URL || '/api/admin');
 
 class ApiClient {
-  private getToken(): string | null {
-    return localStorage.getItem('admin_token');
-  }
+  private refreshPromise: Promise<boolean> | null = null;
 
   async request<T>(path: string, options: RequestInit = {}): Promise<T> {
-    const token = this.getToken();
     const res = await fetch(`${BASE_URL}${path}`, {
       ...options,
+      credentials: 'include', // Send HttpOnly cookies
+      cache: 'no-store', // Prevent browser from caching GET requests
       headers: {
         'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options.headers,
       },
     });
 
-    if (res.status === 401) {
+    if (res.status === 401 && path !== '/auth/refresh' && path !== '/auth/login') {
       // Try to refresh the session
       const refreshed = await this.tryRefresh();
       if (refreshed) {
-        // Retry the original request with new token
-        const newToken = this.getToken();
+        // Retry the original request (cookies are sent automatically)
         const retryRes = await fetch(`${BASE_URL}${path}`, {
           ...options,
+          credentials: 'include',
+          cache: 'no-store',
           headers: {
             'Content-Type': 'application/json',
-            ...(newToken ? { Authorization: `Bearer ${newToken}` } : {}),
             ...options.headers,
           },
         });
@@ -35,11 +33,11 @@ class ApiClient {
         return retryJson.data;
       }
       
-      // Basic handling: clear token and redirect to login
-      localStorage.removeItem('admin_token');
-      localStorage.removeItem('admin_refresh_token');
+      // Basic handling: clear user and redirect to login
       localStorage.removeItem('admin_user');
-      window.location.href = '/login';
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
       throw new Error('Session expired');
     }
 
@@ -67,27 +65,28 @@ class ApiClient {
   }
 
   private async tryRefresh(): Promise<boolean> {
-    const refreshToken = localStorage.getItem('admin_refresh_token');
-    if (!refreshToken) return false;
-
-    try {
-      const res = await fetch(`${BASE_URL}/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
-      });
-      const json = await res.json();
-      if (json.success && json.data?.token) {
-        localStorage.setItem('admin_token', json.data.token);
-        if (json.data.refreshToken) {
-          localStorage.setItem('admin_refresh_token', json.data.refreshToken);
-        }
-        return true;
-      }
-    } catch (e) {
-      console.error('Admin refresh failed:', e);
+    if (this.refreshPromise) {
+      return this.refreshPromise;
     }
-    return false;
+
+    this.refreshPromise = (async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include', // Send refresh token via HttpOnly cookie
+          headers: { 'Content-Type': 'application/json' },
+        });
+        const json = await res.json();
+        return Boolean(json.success);
+      } catch (e) {
+        console.error('Admin refresh failed:', e);
+        return false;
+      } finally {
+        this.refreshPromise = null;
+      }
+    })();
+
+    return this.refreshPromise;
   }
 }
 

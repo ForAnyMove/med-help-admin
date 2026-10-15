@@ -23,7 +23,7 @@ export const ReviewModerationPage: React.FC = () => {
   });
 
   const updateStatus = useMutation({
-    mutationFn: ({ status, comment }: { status: 'verified' | 'rejected', comment?: string }) => 
+    mutationFn: ({ status, comment }: { status: 'approved' | 'rejected', comment?: string }) => 
       api.put(`/moderation/reviews/${selectedReviewId}`, { status, comment }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['moderationReviews'] });
@@ -46,7 +46,7 @@ export const ReviewModerationPage: React.FC = () => {
 
   const handleApprove = () => {
     if (window.confirm(t('common.confirmAction', { action: t('common.approve') }))) {
-      updateStatus.mutate({ status: 'verified' });
+      updateStatus.mutate({ status: 'approved' });
     }
   };
 
@@ -68,7 +68,7 @@ export const ReviewModerationPage: React.FC = () => {
   const statusTabs = [
     { id: 'all', label: t('common.all') },
     { id: 'pending', label: t('common.pending') },
-    { id: 'verified', label: t('common.verified') },
+    { id: 'approved', label: t('common.approved') },
     { id: 'rejected', label: t('common.rejected') }
   ];
 
@@ -135,8 +135,8 @@ export const ReviewModerationPage: React.FC = () => {
                   </div>
                   
                   <div style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: 12, 
-                    backgroundColor: review.moderation_status === 'pending' ? 'var(--warning-bg)' : review.moderation_status === 'verified' ? 'var(--success-bg)' : 'var(--danger-bg)',
-                    color: review.moderation_status === 'pending' ? 'var(--warning)' : review.moderation_status === 'verified' ? 'var(--success)' : 'var(--danger)'
+                    backgroundColor: review.moderation_status === 'pending' ? 'var(--warning-bg)' : review.moderation_status === 'approved' ? 'var(--success-bg)' : 'var(--danger-bg)',
+                    color: review.moderation_status === 'pending' ? 'var(--warning)' : review.moderation_status === 'approved' ? 'var(--success)' : 'var(--danger)'
                   }}>
                     {review.moderation_status}
                   </div>
@@ -199,7 +199,7 @@ export const ReviewModerationPage: React.FC = () => {
               </button>
             )}
 
-            {selectedReview.moderation_status !== 'verified' && selectedReview.moderation_status !== 'approved' && (
+            {selectedReview.moderation_status !== 'approved' && (
               <button 
                 className="btn btn-primary" 
                 style={{ flex: 1, backgroundColor: 'var(--success)' }}

@@ -41,11 +41,10 @@ export const LoginPage: React.FC = () => {
       setError(null);
       
       const response = await api.post<{ 
-        admin: { id: string; displayName: string; role: 'admin' | 'super_admin'; email: string; },
-        accessToken: string;
+        admin: { id: string; displayName: string; role: 'admin' | 'super_admin'; email: string; };
       }>('/auth/login', data);
       
-      login(response.accessToken, response.admin);
+      login(response.admin);
       navigate(from, { replace: true });
     } catch (err: any) {
       setError(err.message || 'Login failed');

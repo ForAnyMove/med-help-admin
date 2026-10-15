@@ -14,7 +14,7 @@ interface AuthContextType {
   admin: AdminUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (token: string, user: AdminUser) => void;
+  login: (user: AdminUser) => void;
   logout: () => void;
 }
 
@@ -23,7 +23,14 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 import i18n from '../../i18n'; // Ensure we import the i18n instance
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [admin, setAdmin] = useState<AdminUser | null>(null);
+  const [admin, setAdmin] = useState<AdminUser | null>(() => {
+    try {
+      const savedUser = localStorage.getItem('admin_user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch {
+      return null;
+    }
+  });
   const [isLoading, setIsLoading] = useState(true);
 
   const applyLanguage = (user: AdminUser) => {
@@ -35,22 +42,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Check if logged in on mount
     const checkAuth = async () => {
-      const token = localStorage.getItem('admin_token');
       const savedUser = localStorage.getItem('admin_user');
       
-      if (token && savedUser) {
+      // We rely on the /auth/me call automatically sending the HttpOnly cookie.
+      // If we have a saved user, we try to fetch /me to verify the session.
+      if (savedUser) {
         try {
           // Verify token is still valid
           const data = await api.get<{ admin: AdminUser }>('/auth/me');
-          setAdmin(data.admin);
-          applyLanguage(data.admin);
-          localStorage.setItem('admin_user', JSON.stringify(data.admin));
-        } catch (error) {
+          if (data?.admin) {
+            setAdmin(data.admin);
+            applyLanguage(data.admin);
+            localStorage.setItem('admin_user', JSON.stringify(data.admin));
+          }
+        } catch (error: any) {
           console.error('Session verification failed', error);
-          localStorage.removeItem('admin_token');
-          localStorage.removeItem('admin_user');
-          setAdmin(null);
+          if (error?.message === 'Session expired') {
+            localStorage.removeItem('admin_user');
+            setAdmin(null);
+          }
         }
+      } else {
+        setAdmin(null);
       }
       setIsLoading(false);
     };
@@ -58,8 +71,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     checkAuth();
   }, []);
 
-  const login = (token: string, user: AdminUser) => {
-    localStorage.setItem('admin_token', token);
+  const login = (user: AdminUser) => {
     localStorage.setItem('admin_user', JSON.stringify(user));
     setAdmin(user);
     applyLanguage(user);
@@ -67,13 +79,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
-      if (localStorage.getItem('admin_token')) {
-        await api.post('/auth/logout', {});
-      }
+      await api.post('/auth/logout', {});
     } catch (e) {
       // Ignore errors on logout
     } finally {
-      localStorage.removeItem('admin_token');
       localStorage.removeItem('admin_user');
       setAdmin(null);
     }

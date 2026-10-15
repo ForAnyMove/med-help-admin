@@ -10,13 +10,13 @@ const SocketContext = createContext<{ socket: Socket | null }>({ socket: null })
 export const useSocket = () => useContext(SocketContext);
 
 export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { session, isAuthenticated } = useAuth();
+  const { admin, isAuthenticated } = useAuth();
   const [socket, setSocket] = useState<Socket | null>(null);
   const queryClient = useQueryClient();
   const { t } = useTranslation();
 
   useEffect(() => {
-    if (!isAuthenticated || !session?.access_token) {
+    if (!isAuthenticated || !admin) {
       if (socket) {
         socket.disconnect();
         setSocket(null);
@@ -24,10 +24,21 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
 
-    const backendUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3000';
+    const getSocketUrl = () => {
+      if (import.meta.env.DEV) {
+        return 'http://localhost:3000';
+      }
+      const apiUrl = import.meta.env.VITE_API_URL;
+      if (apiUrl) {
+        return apiUrl.replace(/\/api.*$/, '');
+      }
+      return window.location.origin;
+    };
+
+    const backendUrl = getSocketUrl();
     
     const newSocket = io(backendUrl, {
-      auth: { token: session.access_token }
+      withCredentials: true
     });
 
     newSocket.on('connect', () => {
@@ -50,6 +61,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       } else if (data.type === 'doc_verification') {
         queryClient.invalidateQueries({ queryKey: ['verificationDoctors'] });
         queryClient.invalidateQueries({ queryKey: ['verificationOrgs'] });
+        queryClient.invalidateQueries({ queryKey: ['verificationDoctorDetail'] });
+        queryClient.invalidateQueries({ queryKey: ['verificationOrgDetail'] });
         queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
         toast.info(t('notifications.newDocVerification', 'Новая заявка на верификацию документов'));
       }
@@ -60,7 +73,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return () => {
       newSocket.disconnect();
     };
-  }, [isAuthenticated, session?.access_token, queryClient, t]);
+  }, [isAuthenticated, admin?.id, queryClient, t]);
 
   return (
     <SocketContext.Provider value={{ socket }}>
