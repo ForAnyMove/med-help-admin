@@ -68,6 +68,9 @@ export const NotificationBell: React.FC = () => {
         className="btn btn-outline" 
         style={{ padding: '6px', position: 'relative', border: 'none' }}
         onClick={() => setIsOpen(!isOpen)}
+        aria-label={totalCount > 0 ? `Уведомления, новых: ${totalCount}` : 'Уведомления'}
+        aria-expanded={isOpen}
+        aria-haspopup="true"
       >
         <Bell size={20} color="var(--n600)" />
         {totalCount > 0 && (

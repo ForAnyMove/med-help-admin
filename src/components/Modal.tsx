@@ -40,6 +40,9 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }
       
       <div 
         className="card" 
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
         style={{ 
           minWidth: '400px', 
           maxWidth: '90%',
@@ -50,9 +53,10 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }
         onClick={e => e.stopPropagation()}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h3 style={{ margin: 0 }}>{title}</h3>
+          <h3 id="modal-title" style={{ margin: 0 }}>{title}</h3>
           <button 
             onClick={onClose} 
+            aria-label="Закрыть"
             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex' }}
           >
             <X size={20} color="var(--n500)" />

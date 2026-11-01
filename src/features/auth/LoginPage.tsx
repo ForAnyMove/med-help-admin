@@ -73,27 +73,33 @@ export const LoginPage: React.FC = () => {
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex-col" style={{ gap: '1.25rem', textAlign: 'left' }}>
           <div>
-            <label className="label" style={{ color: 'rgba(255,255,255,0.9)' }}>{t('auth.email')}</label>
+            <label htmlFor="email" className="label" style={{ color: 'rgba(255,255,255,0.9)' }}>{t('auth.email')}</label>
             <input 
+              id="email"
               type="email" 
               className={clsx('input', errors.email && 'error')} 
               placeholder="admin@medhelp.com"
+              aria-invalid={!!errors.email}
+              aria-describedby={errors.email ? 'email-error' : undefined}
               {...register('email')}
               disabled={isSubmitting}
             />
-            {errors.email && <span className="error-msg">{errors.email.message}</span>}
+            {errors.email && <span id="email-error" role="alert" className="error-msg">{errors.email.message}</span>}
           </div>
 
           <div>
-            <label className="label" style={{ color: 'rgba(255,255,255,0.9)' }}>{t('auth.password')}</label>
+            <label htmlFor="password" className="label" style={{ color: 'rgba(255,255,255,0.9)' }}>{t('auth.password')}</label>
             <input 
+              id="password"
               type="password" 
               className={clsx('input', errors.password && 'error')} 
               placeholder="••••••••"
+              aria-invalid={!!errors.password}
+              aria-describedby={errors.password ? 'password-error' : undefined}
               {...register('password')}
               disabled={isSubmitting}
             />
-            {errors.password && <span className="error-msg">{errors.password.message}</span>}
+            {errors.password && <span id="password-error" role="alert" className="error-msg">{errors.password.message}</span>}
           </div>
 
           <button 
