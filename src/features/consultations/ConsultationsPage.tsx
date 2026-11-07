@@ -1,29 +1,68 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { useTranslation } from 'react-i18next';
-import { Search, ChevronRight, X, User, FileText, Star, Clock, Calendar, FileDown } from 'lucide-react';
-import clsx from 'clsx';
+import { Search, ChevronRight, ChevronLeft, X, User, FileText, Star, Clock, Calendar, FileDown } from 'lucide-react';
 import { format } from 'date-fns';
 
-import { useLocation } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { downloadCSV } from '../../utils/export';
+import { useDebounce } from '../../hooks/useDebounce';
 
 export const ConsultationsPage: React.FC = () => {
   const { t } = useTranslation();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   
-  const [statusFilter, setStatusFilter] = useState((location.state as any)?.filter || 'all');
-  const [searchQuery, setSearchQuery] = useState(''); // Note: simple client-side search for now
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const statusFilter = searchParams.get('status') || (location.state as any)?.filter || 'all';
+  const searchQuery = searchParams.get('search') || '';
+  const dateFrom = searchParams.get('dateFrom') || '';
+  const dateTo = searchParams.get('dateTo') || '';
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+  const selectedId = searchParams.get('id');
+
+  const [searchInput, setSearchInput] = useState(searchQuery);
+  const debouncedSearch = useDebounce(searchInput, 300);
+
+  useEffect(() => {
+    setSearchInput(searchQuery);
+  }, [searchQuery]);
+
+  const updateFilter = (key: string, value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (!value || value === 'all') {
+      next.delete(key);
+    } else {
+      next.set(key, value);
+    }
+    if (key !== 'page') {
+      next.delete('page');
+    }
+    setSearchParams(next, { replace: true });
+  };
+
+  useEffect(() => {
+    if (debouncedSearch !== searchQuery) {
+      updateFilter('search', debouncedSearch);
+    }
+  }, [debouncedSearch]);
+
+  const setSelectedId = (id: string | null) => {
+    const next = new URLSearchParams(searchParams);
+    if (!id) {
+      next.delete('id');
+      setSearchParams(next, { replace: true });
+    } else {
+      next.set('id', id);
+      setSearchParams(next);
+    }
+  };
 
   const { data: listData, isLoading: isListLoading } = useQuery({
-    queryKey: ['consultations', statusFilter, dateFrom, dateTo],
+    queryKey: ['consultations', statusFilter, searchQuery, dateFrom, dateTo, page],
     queryFn: () => {
-      let url = `/consultations?status=${statusFilter}&limit=100`;
+      let url = `/consultations?status=${statusFilter}&page=${page}&limit=50`;
+      if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
       if (dateFrom) url += `&dateFrom=${dateFrom}`;
       if (dateTo) url += `&dateTo=${dateTo}`;
       return api.get<any>(url);
@@ -99,8 +138,8 @@ export const ConsultationsPage: React.FC = () => {
               <input 
                 type="text" 
                 placeholder={t('consultations.search')}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
                 className="input"
                 style={{ width: '100%', paddingLeft: '36px', paddingTop: '8px', paddingBottom: '8px' }}
               />
@@ -109,7 +148,7 @@ export const ConsultationsPage: React.FC = () => {
             {/* Status Filter */}
             <select 
               value={statusFilter} 
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e) => updateFilter('status', e.target.value)}
               className="input"
               style={{ width: 'auto', minWidth: '150px', padding: '8px 12px' }}
             >
@@ -125,7 +164,7 @@ export const ConsultationsPage: React.FC = () => {
               type="date" 
               className="input" 
               value={dateFrom} 
-              onChange={e => setDateFrom(e.target.value)}
+              onChange={e => updateFilter('dateFrom', e.target.value)}
               style={{ width: '140px', padding: '8px 12px' }}
               title={t('consultations.dateFrom')}
             />
@@ -133,7 +172,7 @@ export const ConsultationsPage: React.FC = () => {
               type="date" 
               className="input" 
               value={dateTo} 
-              onChange={e => setDateTo(e.target.value)}
+              onChange={e => updateFilter('dateTo', e.target.value)}
               style={{ width: '140px', padding: '8px 12px' }}
               title={t('consultations.dateTo')}
             />
@@ -195,6 +234,31 @@ export const ConsultationsPage: React.FC = () => {
             </table>
           )}
         </div>
+        {listData?.totalPages > 1 && (
+          <div style={{ padding: '12px 16px', borderTop: '1px solid var(--n200)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--n50)' }}>
+            <span style={{ fontSize: '0.875rem', color: 'var(--n600)' }}>
+              Page {page} of {listData.totalPages} ({listData.total} total)
+            </span>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                className="btn btn-outline"
+                style={{ padding: '4px 10px' }}
+                disabled={page <= 1}
+                onClick={() => updateFilter('page', String(page - 1))}
+              >
+                <ChevronLeft size={16} /> Prev
+              </button>
+              <button
+                className="btn btn-outline"
+                style={{ padding: '4px 10px' }}
+                disabled={page >= listData.totalPages}
+                onClick={() => updateFilter('page', String(page + 1))}
+              >
+                Next <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Right Detail Panel */}

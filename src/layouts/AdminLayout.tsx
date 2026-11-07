@@ -23,7 +23,7 @@ export const AdminLayout: React.FC = () => {
 
   const handleLogout = async () => {
     await logout();
-    navigate('/login');
+    navigate('/login', { replace: true });
   };
 
   const navGroups = [
@@ -57,8 +57,9 @@ export const AdminLayout: React.FC = () => {
       label: t('sidebar.management'),
       items: [
         { to: '/users', icon: Users, label: t('sidebar.users') },
+        { to: '/organizations', icon: Building2, label: `${t('sidebar.organizations')} (CRM)` },
         { to: '/professions', icon: BriefcaseMedical, label: t('sidebar.professions') },
-        { to: '/statistics', icon: LayoutDashboard, label: t('sidebar.statistics') }, // Use different icon
+        { to: '/statistics', icon: LayoutDashboard, label: t('sidebar.statistics') },
         { to: '/settings', icon: Settings, label: t('sidebar.settings') },
       ]
     }

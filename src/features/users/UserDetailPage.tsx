@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { useTranslation } from 'react-i18next';
@@ -7,15 +7,40 @@ import { ArrowLeft, User, ShieldAlert, CheckCircle, Activity, Briefcase, FileTex
 import clsx from 'clsx';
 import { format } from 'date-fns';
 import { useAuth } from '../auth/AuthContext';
+import { Modal } from '../../components/Modal';
 
 export const UserDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { admin } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'info' | 'role' | 'consultations' | 'activity'>('info');
+  const tabParam = searchParams.get('tab');
+  const activeTab: 'info' | 'role' | 'consultations' | 'activity' =
+    tabParam === 'role' || tabParam === 'consultations' || tabParam === 'activity' ? tabParam : 'info';
+
+  const setActiveTab = (tab: 'info' | 'role' | 'consultations' | 'activity') => {
+    const next = new URLSearchParams(searchParams);
+    if (tab === 'info') {
+      next.delete('tab');
+    } else {
+      next.set('tab', tab);
+    }
+    setSearchParams(next, { replace: true });
+  };
+
+  const handleBack = () => {
+    if (window.history.state && window.history.state.idx > 0) {
+      navigate(-1);
+    } else {
+      navigate('/users', { replace: true });
+    }
+  };
+
+  const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
+  const [blockReason, setBlockReason] = useState('');
 
   const { data, isLoading } = useQuery({
     queryKey: ['user', id],
@@ -27,6 +52,8 @@ export const UserDetailPage: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user', id] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      setIsBlockModalOpen(false);
+      setBlockReason('');
     }
   });
 
@@ -35,19 +62,20 @@ export const UserDetailPage: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user', id] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      setIsBlockModalOpen(false);
     }
   });
 
   const handleBlockToggle = () => {
+    setBlockReason('');
+    setIsBlockModalOpen(true);
+  };
+
+  const confirmBlockToggle = () => {
     if (data?.profile?.is_blocked) {
-      if (window.confirm(t('common.confirmAction', { action: t('users.unblock') }))) {
-        unblockMutation.mutate();
-      }
+      unblockMutation.mutate();
     } else {
-      const reason = window.prompt(t('users.blockReason'));
-      if (reason !== null) {
-        blockMutation.mutate(reason || 'No reason provided');
-      }
+      blockMutation.mutate(blockReason.trim() || 'No reason provided');
     }
   };
 
@@ -72,7 +100,7 @@ export const UserDetailPage: React.FC = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-6)' }}>
       {/* Back Button */}
       <div>
-        <button onClick={() => navigate('/users')} className="btn btn-outline" style={{ border: 'none', padding: 0 }}>
+        <button onClick={handleBack} className="btn btn-outline" style={{ border: 'none', padding: 0 }}>
           <ArrowLeft size={20} /> Back to Users
         </button>
       </div>
@@ -287,6 +315,40 @@ export const UserDetailPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      <Modal
+        isOpen={isBlockModalOpen}
+        onClose={() => setIsBlockModalOpen(false)}
+        title={profile.is_blocked ? t('users.unblock') : t('users.block')}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <p style={{ margin: 0, color: 'var(--n700)' }}>
+            {t('common.confirmAction', { action: profile.is_blocked ? t('users.unblock') : t('users.block') })}
+          </p>
+          {!profile.is_blocked && (
+            <textarea
+              className="input"
+              rows={3}
+              placeholder={t('users.blockReason')}
+              value={blockReason}
+              onChange={(e) => setBlockReason(e.target.value)}
+            />
+          )}
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+            <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setIsBlockModalOpen(false)}>
+              {t('common.cancel')}
+            </button>
+            <button
+              className={clsx('btn', profile.is_blocked ? 'btn-primary' : 'btn-danger')}
+              style={{ flex: 1 }}
+              onClick={confirmBlockToggle}
+              disabled={blockMutation.isPending || unblockMutation.isPending}
+            >
+              {profile.is_blocked ? t('users.unblock') : t('users.block')}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

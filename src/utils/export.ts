@@ -3,18 +3,19 @@ export function downloadCSV(data: any[], filename: string) {
 
   const header = Object.keys(data[0]);
   
-  // Format cells: wrap in quotes to escape commas and quotes
+  // Format cells: prevent CSV formula injection and wrap in quotes
   const formatCell = (val: any) => {
     if (val === null || val === undefined) return '""';
-    const str = String(val);
-    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-      return `"${str.replace(/"/g, '""')}"`;
+    let str = String(val);
+    // Prevent CSV Formula Injection (DDE / Excel formula execution)
+    if (/^[=+\-@\t\r]/.test(str)) {
+      str = `'${str}`;
     }
-    return `"${str}"`; // Wrapping everything in quotes is generally safer for CSV
+    return `"${str.replace(/"/g, '""')}"`;
   };
 
   const csvContent = [
-    header.join(','),
+    header.map(h => formatCell(h)).join(','),
     ...data.map(row => header.map(fieldName => formatCell(row[fieldName])).join(','))
   ].join('\n');
 
@@ -30,5 +31,6 @@ export function downloadCSV(data: any[], filename: string) {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 }

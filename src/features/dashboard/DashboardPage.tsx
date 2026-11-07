@@ -67,36 +67,45 @@ export const DashboardPage: React.FC = () => {
             value={data.pendingDoctorVerifications} 
             icon={UserCheck} 
             color="var(--warning)" 
-            to="/verification/doctors" 
+            to="/verification/doctors?status=pending" 
           />
           <StatCard 
             title={t('dashboard.pendingOrgs')} 
             value={data.pendingOrgVerifications} 
             icon={Building2} 
             color="var(--warning)" 
-            to="/verification/organizations" 
+            to="/verification/organizations?status=pending" 
           />
           <StatCard 
             title={t('dashboard.avatarModeration')} 
             value={data.pendingAvatarModerations} 
             icon={ShieldAlert} 
             color="var(--warning)" 
-            to="/moderation/profiles" 
+            to="/moderation/profiles?type=avatar&status=pending" 
           />
           <StatCard 
             title={t('dashboard.aboutModeration')} 
             value={data.pendingAboutModerations} 
             icon={ShieldAlert} 
             color="var(--warning)" 
-            to="/moderation/profiles" 
+            to="/moderation/profiles?type=about&status=pending" 
           />
           <StatCard 
             title={t('dashboard.pendingReviews')} 
             value={data.pendingReviewModerations} 
             icon={Star} 
             color="var(--warning)" 
-            to="/moderation/reviews" 
+            to="/moderation/reviews?status=pending" 
           />
+          {data.pendingReports !== undefined && (
+            <StatCard 
+              title="Pending Reports" 
+              value={data.pendingReports} 
+              icon={ShieldAlert} 
+              color="var(--danger)" 
+              to="/moderation/reports?status=pending" 
+            />
+          )}
         </div>
       </div>
 
@@ -120,7 +129,7 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
         </Link>
-        <Link to="/consultations" state={{ filter: 'completed' }} style={{ textDecoration: 'none', color: 'inherit', display: 'block', height: '100%' }}>
+        <Link to="/consultations?status=completed" style={{ textDecoration: 'none', color: 'inherit', display: 'block', height: '100%' }}>
           <div className="card table-row-hover" style={{ display: 'flex', alignItems: 'center', gap: '1rem', height: '100%', cursor: 'pointer', transition: 'background-color 0.2s' }}>
             <UserCheck size={32} color="var(--success)" />
             <div>

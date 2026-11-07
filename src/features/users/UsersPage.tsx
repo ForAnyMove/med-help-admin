@@ -1,25 +1,52 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api/client';
-import { Search, ChevronRight, User, FileDown } from 'lucide-react';
+import { Search, ChevronRight, ChevronLeft, User, FileDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { downloadCSV } from '../../utils/export';
+import { useDebounce } from '../../hooks/useDebounce';
 
 export const UsersPage: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   
-  const [roleFilter, setRoleFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  
-  // Basic debouncing for search could be added here, keeping simple for now
+  const roleFilter = searchParams.get('role') || 'all';
+  const statusFilter = searchParams.get('status') || 'all';
+  const searchQuery = searchParams.get('search') || '';
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+
+  const [searchInput, setSearchInput] = useState(searchQuery);
+  const debouncedSearch = useDebounce(searchInput, 300);
+
+  useEffect(() => {
+    setSearchInput(searchQuery);
+  }, [searchQuery]);
+
+  const updateFilter = (key: string, value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (!value || value === 'all') {
+      next.delete(key);
+    } else {
+      next.set(key, value);
+    }
+    if (key !== 'page') {
+      next.delete('page');
+    }
+    setSearchParams(next, { replace: true });
+  };
+
+  useEffect(() => {
+    if (debouncedSearch !== searchQuery) {
+      updateFilter('search', debouncedSearch);
+    }
+  }, [debouncedSearch]);
   
   const { data, isLoading } = useQuery({
-    queryKey: ['users', roleFilter, statusFilter, searchQuery],
-    queryFn: () => api.get<any>(`/users?role=${roleFilter}&status=${statusFilter}&search=${searchQuery}&limit=50`)
+    queryKey: ['users', roleFilter, statusFilter, searchQuery, page],
+    queryFn: () => api.get<any>(`/users?role=${roleFilter}&status=${statusFilter}&search=${encodeURIComponent(searchQuery)}&page=${page}&limit=50`)
   });
 
   const filteredUsers = data?.items;
@@ -28,7 +55,7 @@ export const UsersPage: React.FC = () => {
     if (!filteredUsers || filteredUsers.length === 0) return;
     const exportData = filteredUsers.map((u: any) => ({
       ID: u.id,
-      Name: u.name || 'N/A',
+      Name: `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.name || 'N/A',
       Email: u.email,
       Role: u.role,
       Phone: u.phone || 'N/A',
@@ -57,8 +84,8 @@ export const UsersPage: React.FC = () => {
             <input 
               type="text" 
               placeholder={t('users.search')}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               className="input"
               style={{ width: '100%', paddingLeft: '40px' }}
             />
@@ -67,7 +94,7 @@ export const UsersPage: React.FC = () => {
           {/* Role Filter */}
           <select 
             value={roleFilter} 
-            onChange={(e) => setRoleFilter(e.target.value)}
+            onChange={(e) => updateFilter('role', e.target.value)}
             className="input"
             style={{ width: '160px' }}
           >
@@ -82,7 +109,7 @@ export const UsersPage: React.FC = () => {
           {/* Status Filter */}
           <select 
             value={statusFilter} 
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => updateFilter('status', e.target.value)}
             className="input"
             style={{ width: '160px' }}
           >
@@ -161,6 +188,31 @@ export const UsersPage: React.FC = () => {
           </tbody>
         </table>
       </div>
+      {data?.totalPages > 1 && (
+        <div style={{ padding: '12px 24px', borderTop: '1px solid var(--n200)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--n50)' }}>
+          <span style={{ fontSize: '0.875rem', color: 'var(--n600)' }}>
+            Page {page} of {data.totalPages} ({data.total} total)
+          </span>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              className="btn btn-outline"
+              style={{ padding: '4px 10px' }}
+              disabled={page <= 1}
+              onClick={() => updateFilter('page', String(page - 1))}
+            >
+              <ChevronLeft size={16} /> Prev
+            </button>
+            <button
+              className="btn btn-outline"
+              style={{ padding: '4px 10px' }}
+              disabled={page >= data.totalPages}
+              onClick={() => updateFilter('page', String(page + 1))}
+            >
+              Next <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
       <style>{`
         .table-row-hover:hover {
           background-color: var(--n50);

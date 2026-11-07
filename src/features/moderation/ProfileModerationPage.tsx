@@ -1,22 +1,74 @@
 import React, { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
-import { Check, X, ShieldAlert, Image, AlignLeft } from 'lucide-react';
+import { Check, X, Image, AlignLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import clsx from 'clsx';
-import { format } from 'date-fns';
 
 import { useTranslation } from 'react-i18next';
+import { Modal } from '../../components/Modal';
 
 export const ProfileModerationPage: React.FC = () => {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const [typeFilter, setTypeFilter] = useState<'avatar' | 'about'>('avatar');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const typeFilter: 'avatar' | 'about' = searchParams.get('type') === 'about' ? 'about' : 'avatar';
+  const statusFilter = searchParams.get('status') || 'all';
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+  const selectedProfileId = searchParams.get('id');
+
+  const [actionModal, setActionModal] = useState<{ status: 'approved' | 'rejected' } | null>(null);
+  const [rejectComment, setRejectComment] = useState('');
+
+  const setTypeFilter = (type: 'avatar' | 'about') => {
+    const next = new URLSearchParams(searchParams);
+    if (type === 'avatar') {
+      next.delete('type');
+    } else {
+      next.set('type', type);
+    }
+    next.delete('page');
+    next.delete('id');
+    setSearchParams(next, { replace: true });
+  };
+
+  const setStatusFilter = (status: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (!status || status === 'all') {
+      next.delete('status');
+    } else {
+      next.set('status', status);
+    }
+    next.delete('page');
+    next.delete('id');
+    setSearchParams(next, { replace: true });
+  };
+
+  const setPage = (newPage: number) => {
+    const next = new URLSearchParams(searchParams);
+    if (newPage <= 1) {
+      next.delete('page');
+    } else {
+      next.set('page', String(newPage));
+    }
+    setSearchParams(next, { replace: true });
+  };
+
+  const setSelectedProfileId = (id: string | null) => {
+    const next = new URLSearchParams(searchParams);
+    if (!id) {
+      next.delete('id');
+      setSearchParams(next, { replace: true });
+    } else {
+      next.set('id', id);
+      setSearchParams(next);
+    }
+  };
 
   const { data: listData, isLoading } = useQuery({
-    queryKey: ['moderationProfiles', typeFilter, statusFilter],
-    queryFn: () => api.get<any>(`/moderation/profiles?type=${typeFilter}&status=${statusFilter}&limit=50`)
+    queryKey: ['moderationProfiles', typeFilter, statusFilter, page],
+    queryFn: () => api.get<any>(`/moderation/profiles?type=${typeFilter}&status=${statusFilter}&page=${page}&limit=50`)
   });
 
   const updateStatus = useMutation({
@@ -25,17 +77,23 @@ export const ProfileModerationPage: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['moderationProfiles'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
+      setActionModal(null);
+      setRejectComment('');
       setSelectedProfileId(null);
     }
   });
 
   const handleAction = (status: 'approved' | 'rejected') => {
-    const comment = status === 'rejected' ? window.prompt(t('common.reasonForRejection')) : '';
-    if (status === 'rejected' && comment === null) return;
-    
-    if (window.confirm(t('common.confirmAction', { action: status }))) {
-      updateStatus.mutate({ status, comment: comment || undefined });
-    }
+    setRejectComment('');
+    setActionModal({ status });
+  };
+
+  const confirmAction = () => {
+    if (!actionModal) return;
+    updateStatus.mutate({
+      status: actionModal.status,
+      comment: actionModal.status === 'rejected' ? (rejectComment.trim() || undefined) : undefined
+    });
   };
 
   const statusTabs = [
@@ -66,7 +124,7 @@ export const ProfileModerationPage: React.FC = () => {
             {typeTabs.map(tab => (
               <button
                 key={tab.id}
-                onClick={() => { setTypeFilter(tab.id as any); setSelectedProfileId(null); }}
+                onClick={() => setTypeFilter(tab.id as any)}
                 className={clsx('btn', typeFilter === tab.id ? 'btn-primary' : 'btn-outline')}
                 style={{ padding: '6px 12px', fontSize: '0.875rem', flex: 1 }}
               >
@@ -141,6 +199,21 @@ export const ProfileModerationPage: React.FC = () => {
             </div>
           )}
         </div>
+        {listData?.totalPages > 1 && (
+          <div style={{ padding: '10px 16px', borderTop: '1px solid var(--n200)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--n50)' }}>
+            <span style={{ fontSize: '0.8rem', color: 'var(--n600)' }}>
+              Page {page} of {listData.totalPages}
+            </span>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button className="btn btn-outline" style={{ padding: '4px 8px' }} disabled={page <= 1} onClick={() => setPage(page - 1)}>
+                <ChevronLeft size={14} />
+              </button>
+              <button className="btn btn-outline" style={{ padding: '4px 8px' }} disabled={page >= listData.totalPages} onClick={() => setPage(page + 1)}>
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Right Detail Panel */}
@@ -203,6 +276,40 @@ export const ProfileModerationPage: React.FC = () => {
           )}
         </div>
       )}
+
+      <Modal
+        isOpen={!!actionModal}
+        onClose={() => setActionModal(null)}
+        title={actionModal?.status === 'approved' ? t('common.approve') : t('common.reject')}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <p style={{ margin: 0, color: 'var(--n700)' }}>
+            {t('common.confirmAction', { action: actionModal?.status || '' })}
+          </p>
+          {actionModal?.status === 'rejected' && (
+            <textarea
+              className="input"
+              rows={3}
+              placeholder={t('common.reasonForRejection')}
+              value={rejectComment}
+              onChange={(e) => setRejectComment(e.target.value)}
+            />
+          )}
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+            <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setActionModal(null)}>
+              {t('common.cancel')}
+            </button>
+            <button
+              className={clsx('btn', actionModal?.status === 'approved' ? 'btn-primary' : 'btn-danger')}
+              style={{ flex: 1 }}
+              onClick={confirmAction}
+              disabled={updateStatus.isPending}
+            >
+              {actionModal?.status === 'approved' ? t('common.approve') : t('common.reject')}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

@@ -1,22 +1,51 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { useTranslation } from 'react-i18next';
-import { Search, Building2, ChevronRight, FileDown } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Search, Building2, ChevronRight, ChevronLeft, FileDown } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { downloadCSV } from '../../utils/export';
+import { useDebounce } from '../../hooks/useDebounce';
 
 export const OrganizationsPage: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const statusFilter = searchParams.get('status') || 'all';
+  const searchQuery = searchParams.get('search') || '';
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+
+  const [searchInput, setSearchInput] = useState(searchQuery);
+  const debouncedSearch = useDebounce(searchInput, 300);
+
+  useEffect(() => {
+    setSearchInput(searchQuery);
+  }, [searchQuery]);
+
+  const updateFilter = (key: string, value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (!value || value === 'all') {
+      next.delete(key);
+    } else {
+      next.set(key, value);
+    }
+    if (key !== 'page') {
+      next.delete('page');
+    }
+    setSearchParams(next, { replace: true });
+  };
+
+  useEffect(() => {
+    if (debouncedSearch !== searchQuery) {
+      updateFilter('search', debouncedSearch);
+    }
+  }, [debouncedSearch]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['organizations_crm', statusFilter, searchQuery],
-    queryFn: () => api.get<any>(`/organizations?status=${statusFilter}&search=${searchQuery}&limit=50`)
+    queryKey: ['organizations_crm', statusFilter, searchQuery, page],
+    queryFn: () => api.get<any>(`/organizations?status=${statusFilter}&search=${encodeURIComponent(searchQuery)}&page=${page}&limit=50`)
   });
 
   const filteredOrgs = data?.items;
@@ -56,8 +85,8 @@ export const OrganizationsPage: React.FC = () => {
             <input 
               type="text" 
               placeholder="Search organizations..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               className="input"
               style={{ width: '100%', paddingLeft: '40px' }}
             />
@@ -66,7 +95,7 @@ export const OrganizationsPage: React.FC = () => {
           {/* Status Filter */}
           <select 
             value={statusFilter} 
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => updateFilter('status', e.target.value)}
             className="input"
             style={{ width: 'auto', minWidth: '150px' }}
           >
@@ -137,6 +166,31 @@ export const OrganizationsPage: React.FC = () => {
           </tbody>
         </table>
       </div>
+      {data?.totalPages > 1 && (
+        <div style={{ padding: '12px 24px', borderTop: '1px solid var(--n200)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--n50)' }}>
+          <span style={{ fontSize: '0.875rem', color: 'var(--n600)' }}>
+            Page {page} of {data.totalPages} ({data.total} total)
+          </span>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              className="btn btn-outline"
+              style={{ padding: '4px 10px' }}
+              disabled={page <= 1}
+              onClick={() => updateFilter('page', String(page - 1))}
+            >
+              <ChevronLeft size={16} /> Prev
+            </button>
+            <button
+              className="btn btn-outline"
+              style={{ padding: '4px 10px' }}
+              disabled={page >= data.totalPages}
+              onClick={() => updateFilter('page', String(page + 1))}
+            >
+              Next <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       <style>{`
         .table-row-hover:hover {

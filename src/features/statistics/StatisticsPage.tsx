@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { useTranslation } from 'react-i18next';
@@ -12,8 +13,20 @@ const COLORS = ['#23D3C2', '#FF7062', '#FFCF65', '#47A4FF', '#8B5CF6'];
 
 export const StatisticsPage: React.FC = () => {
   const { t } = useTranslation();
+  const [searchParams, setSearchParams] = useSearchParams();
   
-  const [period, setPeriod] = useState('30d');
+  const periodParam = searchParams.get('period');
+  const period = periodParam === '7d' || periodParam === '90d' || periodParam === '1y' ? periodParam : '30d';
+
+  const setPeriod = (p: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (p === '30d') {
+      next.delete('period');
+    } else {
+      next.set('period', p);
+    }
+    setSearchParams(next, { replace: true });
+  };
 
   const { data, isLoading } = useQuery({
     queryKey: ['statistics', period],

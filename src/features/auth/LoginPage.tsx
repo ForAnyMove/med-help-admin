@@ -29,7 +29,10 @@ export const LoginPage: React.FC = () => {
     resolver: zodResolver(loginSchema),
   });
 
-  const from = location.state?.from?.pathname || '/dashboard';
+  const fromLocation = location.state?.from;
+  const from = fromLocation
+    ? `${fromLocation.pathname || '/dashboard'}${fromLocation.search || ''}${fromLocation.hash || ''}`
+    : '/dashboard';
 
   if (isAuthenticated) {
     return <Navigate to={from} replace />;

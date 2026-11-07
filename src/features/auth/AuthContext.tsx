@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 
 interface AdminUser {
@@ -23,6 +24,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 import i18n from '../../i18n'; // Ensure we import the i18n instance
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const queryClient = useQueryClient();
   const [admin, setAdmin] = useState<AdminUser | null>(() => {
     try {
       const savedUser = localStorage.getItem('admin_user');
@@ -54,12 +56,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setAdmin(data.admin);
             applyLanguage(data.admin);
             localStorage.setItem('admin_user', JSON.stringify(data.admin));
+          } else {
+            localStorage.removeItem('admin_user');
+            setAdmin(null);
           }
         } catch (error: any) {
           console.error('Session verification failed', error);
-          if (error?.message === 'Session expired') {
+          const status = error?.status;
+          if (error?.message === 'Session expired' || status === 401 || status === 403 || /not an admin|disabled|invalid|expired/i.test(error?.message || '')) {
             localStorage.removeItem('admin_user');
             setAdmin(null);
+            queryClient.clear();
           }
         }
       } else {
@@ -69,9 +76,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     checkAuth();
-  }, []);
+
+    const handleUnauthorized = () => {
+      localStorage.removeItem('admin_user');
+      setAdmin(null);
+      queryClient.clear();
+    };
+    window.addEventListener('admin:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('admin:unauthorized', handleUnauthorized);
+  }, [queryClient]);
 
   const login = (user: AdminUser) => {
+    queryClient.clear();
     localStorage.setItem('admin_user', JSON.stringify(user));
     setAdmin(user);
     applyLanguage(user);
@@ -85,6 +101,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       localStorage.removeItem('admin_user');
       setAdmin(null);
+      queryClient.clear();
     }
   };
 

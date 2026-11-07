@@ -8,8 +8,18 @@ export const NotFoundPage: React.FC = () => {
   const navigate = useNavigate();
   const error = useRouteError();
 
+  const handleGoBack = () => {
+    const canGoBack = typeof window !== 'undefined' && (window.history.state?.idx > 0 || window.history.length > 2);
+    if (canGoBack) {
+      navigate(-1);
+    } else {
+      navigate('/dashboard', { replace: true });
+    }
+  };
   let is404 = false;
   if (isRouteErrorResponse(error) && error.status === 404) {
+    is404 = true;
+  } else if (!error) {
     is404 = true;
   }
 
@@ -70,7 +80,7 @@ export const NotFoundPage: React.FC = () => {
         <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', width: '100%', justifyContent: 'center' }}>
           <button 
             className="btn btn-outline" 
-            onClick={() => navigate(-1)}
+            onClick={handleGoBack}
             style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
           >
             <ArrowLeft size={18} /> {t('error.goBack', 'Go Back')}
@@ -78,7 +88,7 @@ export const NotFoundPage: React.FC = () => {
           
           <button 
             className="btn btn-primary" 
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/dashboard', { replace: true })}
             style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
           >
             <Home size={18} /> {t('error.goHome', 'Dashboard')}

@@ -33,17 +33,23 @@ class ApiClient {
         return retryJson.data;
       }
       
-      // Basic handling: clear user and redirect to login
+      // Clear user and notify AuthContext so ProtectedRoute performs SPA redirect preserving location state
       localStorage.removeItem('admin_user');
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
-      }
-      throw new Error('Session expired');
+      window.dispatchEvent(new CustomEvent('admin:unauthorized'));
+      const err: any = new Error('Session expired');
+      err.status = 401;
+      throw err;
     }
 
     const json = await res.json();
     if (!json.success) {
-      throw new Error(json.error || 'API Error');
+      const err: any = new Error(json.error || 'API Error');
+      err.status = res.status;
+      if (res.status === 403 && /not an admin|disabled/i.test(json.error || '')) {
+        localStorage.removeItem('admin_user');
+        window.dispatchEvent(new CustomEvent('admin:unauthorized'));
+      }
+      throw err;
     }
     return json.data;
   }

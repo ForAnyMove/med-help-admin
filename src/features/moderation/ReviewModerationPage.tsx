@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
-import { Check, X, Star, Trash2, Edit3 } from 'lucide-react';
+import { Check, Star, Trash2, Edit3, ChevronLeft, ChevronRight } from 'lucide-react';
 import clsx from 'clsx';
 import { format } from 'date-fns';
 
@@ -11,15 +12,53 @@ import { Modal } from '../../components/Modal';
 export const ReviewModerationPage: React.FC = () => {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const statusFilter = searchParams.get('status') || 'all';
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+  const selectedReviewId = searchParams.get('id');
+
+  const setStatusFilter = (status: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (!status || status === 'all') {
+      next.delete('status');
+    } else {
+      next.set('status', status);
+    }
+    next.delete('page');
+    next.delete('id');
+    setSearchParams(next, { replace: true });
+  };
+
+  const setPage = (newPage: number) => {
+    const next = new URLSearchParams(searchParams);
+    if (newPage <= 1) {
+      next.delete('page');
+    } else {
+      next.set('page', String(newPage));
+    }
+    setSearchParams(next, { replace: true });
+  };
+
+  const setSelectedReviewId = (id: string | null) => {
+    const next = new URLSearchParams(searchParams);
+    if (!id) {
+      next.delete('id');
+      setSearchParams(next, { replace: true });
+    } else {
+      next.set('id', id);
+      setSearchParams(next);
+    }
+  };
+
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<'approve' | 'delete' | null>(null);
   const [rejectReason, setRejectReason] = useState('reason1');
   const [rejectComment, setRejectComment] = useState('');
 
   const { data: listData, isLoading } = useQuery({
-    queryKey: ['moderationReviews', statusFilter],
-    queryFn: () => api.get<any>(`/moderation/reviews?status=${statusFilter}&limit=50`)
+    queryKey: ['moderationReviews', statusFilter, page],
+    queryFn: () => api.get<any>(`/moderation/reviews?status=${statusFilter}&page=${page}&limit=50`)
   });
 
   const updateStatus = useMutation({
@@ -45,24 +84,20 @@ export const ReviewModerationPage: React.FC = () => {
   });
 
   const handleApprove = () => {
-    if (window.confirm(t('common.confirmAction', { action: t('common.approve') }))) {
-      updateStatus.mutate({ status: 'approved' });
-    }
+    setConfirmModal('approve');
   };
 
   const handleSendForEdit = () => {
     let finalComment = t(`moderation.${rejectReason}`);
     if (rejectReason === 'other') {
-      if (!rejectComment.trim()) return alert(t('moderation.provideReason'));
+      if (!rejectComment.trim()) return;
       finalComment = rejectComment.trim();
     }
     updateStatus.mutate({ status: 'rejected', comment: finalComment });
   };
 
   const handleDelete = () => {
-    if (window.confirm(t('common.confirmAction', { action: t('moderation.deleteReview') }))) {
-      deleteStatus.mutate();
-    }
+    setConfirmModal('delete');
   };
 
   const statusTabs = [
@@ -145,6 +180,21 @@ export const ReviewModerationPage: React.FC = () => {
             </div>
           )}
         </div>
+        {listData?.totalPages > 1 && (
+          <div style={{ padding: '10px 16px', borderTop: '1px solid var(--n200)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--n50)' }}>
+            <span style={{ fontSize: '0.8rem', color: 'var(--n600)' }}>
+              Page {page} of {listData.totalPages}
+            </span>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button className="btn btn-outline" style={{ padding: '4px 8px' }} disabled={page <= 1} onClick={() => setPage(page - 1)}>
+                <ChevronLeft size={14} />
+              </button>
+              <button className="btn btn-outline" style={{ padding: '4px 8px' }} disabled={page >= listData.totalPages} onClick={() => setPage(page + 1)}>
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Right Detail Panel */}
@@ -249,6 +299,40 @@ export const ReviewModerationPage: React.FC = () => {
             </button>
             <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSendForEdit} disabled={updateStatus.isPending}>
               {t('moderation.sendForEdit')}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={!!confirmModal}
+        onClose={() => setConfirmModal(null)}
+        title={confirmModal === 'approve' ? t('common.approve') : t('moderation.deleteReview')}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <p style={{ margin: 0, color: 'var(--n700)' }}>
+            {t('common.confirmAction', {
+              action: confirmModal === 'approve' ? t('common.approve') : t('moderation.deleteReview')
+            })}
+          </p>
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+            <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setConfirmModal(null)}>
+              {t('common.cancel')}
+            </button>
+            <button
+              className={clsx('btn', confirmModal === 'approve' ? 'btn-primary' : 'btn-danger')}
+              style={{ flex: 1 }}
+              disabled={updateStatus.isPending || deleteStatus.isPending}
+              onClick={() => {
+                if (confirmModal === 'approve') {
+                  updateStatus.mutate({ status: 'approved' });
+                } else {
+                  deleteStatus.mutate();
+                }
+                setConfirmModal(null);
+              }}
+            >
+              {confirmModal === 'approve' ? t('common.approve') : t('moderation.deleteReview')}
             </button>
           </div>
         </div>

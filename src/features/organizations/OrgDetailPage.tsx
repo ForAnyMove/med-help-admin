@@ -1,19 +1,41 @@
 import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Building2, ShieldAlert, CheckCircle, MapPin, Phone, Users, ShieldOff } from 'lucide-react';
 import clsx from 'clsx';
 import { format } from 'date-fns';
+import { Modal } from '../../components/Modal';
 
 export const OrgDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState<'info' | 'doctors'>('info');
+  const activeTab: 'info' | 'doctors' = searchParams.get('tab') === 'doctors' ? 'doctors' : 'info';
+
+  const setActiveTab = (tab: 'info' | 'doctors') => {
+    const next = new URLSearchParams(searchParams);
+    if (tab === 'info') {
+      next.delete('tab');
+    } else {
+      next.set('tab', tab);
+    }
+    setSearchParams(next, { replace: true });
+  };
+
+  const handleBack = () => {
+    if (window.history.state && window.history.state.idx > 0) {
+      navigate(-1);
+    } else {
+      navigate('/organizations', { replace: true });
+    }
+  };
+
+  const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['organization_crm', id],
@@ -25,18 +47,15 @@ export const OrgDetailPage: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['organization_crm', id] });
       queryClient.invalidateQueries({ queryKey: ['organizations_crm'] });
+      setIsBlockModalOpen(false);
     }
   });
 
   const handleBlockToggle = () => {
     if (data?.doc_verification_status === 'rejected') {
-      alert("Organization is already blocked/rejected. You can unblock it via the Verification tab if needed.");
       return;
     }
-    
-    if (window.confirm("Are you sure you want to block this organization? This will reject its verification status.")) {
-      blockMutation.mutate();
-    }
+    setIsBlockModalOpen(true);
   };
 
   if (isLoading) {
@@ -55,7 +74,7 @@ export const OrgDetailPage: React.FC = () => {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <button className="btn btn-outline" style={{ padding: '8px' }} onClick={() => navigate('/organizations')}>
+          <button className="btn btn-outline" style={{ padding: '8px' }} onClick={handleBack}>
             <ArrowLeft size={20} />
           </button>
           
@@ -208,6 +227,31 @@ export const OrgDetailPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <Modal
+        isOpen={isBlockModalOpen}
+        onClose={() => setIsBlockModalOpen(false)}
+        title="Block Organization"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <p style={{ margin: 0, color: 'var(--n700)' }}>
+            Are you sure you want to block this organization? This will reject its verification status.
+          </p>
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+            <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setIsBlockModalOpen(false)}>
+              {t('common.cancel')}
+            </button>
+            <button
+              className="btn btn-danger"
+              style={{ flex: 1 }}
+              onClick={() => blockMutation.mutate()}
+              disabled={blockMutation.isPending}
+            >
+              Block Organization
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

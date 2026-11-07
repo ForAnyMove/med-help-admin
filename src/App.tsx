@@ -25,7 +25,7 @@ import { NotFoundPage } from './features/error/NotFoundPage';
 import { AdminLayout } from './layouts/AdminLayout';
 import './i18n';
 
-const queryClient = new QueryClient();
+export const queryClient = new QueryClient();
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -45,9 +45,12 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 // Role-based Route wrapper
 const RequireRole = ({ children, allowedRoles }: { children: React.ReactNode, allowedRoles: string[] }) => {
-  const { user } = useAuth(); // Assuming useAuth exposes the logged-in admin as `user`
-  if (!user || !user.role) return <Navigate to="/login" replace />;
-  if (!allowedRoles.includes(user.role)) {
+  const { admin, isLoading } = useAuth();
+  if (isLoading) {
+    return <div className="flex-center" style={{ height: '100vh' }}>Loading...</div>;
+  }
+  if (!admin || !admin.role) return <Navigate to="/login" replace />;
+  if (!allowedRoles.includes(admin.role)) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center' }}>
         <h2 style={{ color: '#e74c3c' }}>Access Denied</h2>
@@ -91,7 +94,12 @@ const router = createBrowserRouter([
       { path: 'statistics', element: <StatisticsPage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'admins', element: <RequireRole allowedRoles={['super_admin']}><AdminManagementPage /></RequireRole> }, // super_admin only
+      { path: '*', element: <NotFoundPage /> },
     ],
+  },
+  {
+    path: '*',
+    element: <NotFoundPage />,
   },
 ]);
 

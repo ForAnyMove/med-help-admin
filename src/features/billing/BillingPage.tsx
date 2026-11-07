@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { useTranslation } from 'react-i18next';
@@ -7,7 +8,20 @@ import { CreditCard, Repeat, CheckCircle, XCircle, Clock, AlertCircle } from 'lu
 
 export const BillingPage: React.FC = () => {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<'transactions' | 'subscriptions'>('transactions');
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const activeTab: 'transactions' | 'subscriptions' =
+    searchParams.get('tab') === 'subscriptions' ? 'subscriptions' : 'transactions';
+
+  const setActiveTab = (tab: 'transactions' | 'subscriptions') => {
+    const next = new URLSearchParams(searchParams);
+    if (tab === 'transactions') {
+      next.delete('tab');
+    } else {
+      next.set('tab', tab);
+    }
+    setSearchParams(next, { replace: true });
+  };
 
   const { data: transactions, isLoading: isTxLoading } = useQuery({
     queryKey: ['billing', 'transactions'],
